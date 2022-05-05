@@ -1,0 +1,46 @@
+name: Docker Image CI
+
+on:
+  push:
+    tags: [ 'v*.*.*' ]
+
+env:
+  USERNAME: ${{ github.actor }}
+  REPOSITORY: ${{ github.event.repository.name }}
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v2
+    
+    - name: Login to DockerHub
+      uses: docker/login-action@v1
+      with:
+        username: ${{ secrets.DOCKERHUB_USERNAME }}
+        password: ${{ secrets.DOCKERHUB_TOKEN }}
+
+    - name: Version TAG high
+      run: echo "VERSION_HIGH=${GITHUB_REF#refs/*/}" >> $GITHUB_ENV
+      
+    - name: Version TAG middle
+      run: echo "VERSION_MIDDLE=$VERSION_HIGH" | sed 's/\.[[:digit:]]\{1,3\}$//' >> $GITHUB_ENV
+
+    - name: Version TAG low
+      run: echo "VERSION_LOW=$VERSION_MIDDLE" | sed 's/\.[[:digit:]]\{1,3\}$//' >> $GITHUB_ENV
+
+    - name: Set up QEMU
+      uses: docker/setup-qemu-action@v1
+
+    - name: Set up Docker Buildx
+      uses: docker/setup-buildx-action@v1
+
+    - name: Build and push
+      uses: docker/build-push-action@v2
+      with:
+        context: .
+        platforms: linux/amd64,linux/arm64
+        push: true
+        tags: ${{ env.USERNAME }}/${{ env.REPOSITORY }}:latest,${{ env.USERNAME }}/${{ env.REPOSITORY }}:${{ env.VERSION_HIGH }},${{ env.USERNAME }}/${{ env.REPOSITORY }}:${{ env.VERSION_MIDDLE }},${{ env.USERNAME }}/${{ env.REPOSITORY }}:${{ env.VERSION_LOW }}
